@@ -50,10 +50,9 @@ nanoHMS() {
 
 # Generate a placeholder image for a display if the image file doesn't exist
 genpim() {
-  local -r disp=$1
-  local -r file=$2
+  local -r file=$1
   local -a args=(-size 80x60 -background '#7FFF00' -gravity Center)
-  local -r caption="(Screen $disp inaccessible)"
+  local -r caption="(Screen inaccessible)"
   [[ -e "$file" ]] || { "$mick" "${args[@]}" "caption:$caption" "$file"; }
 }
 
@@ -86,13 +85,13 @@ printf "d%s " $smax >>$DBG
 # (Note that it might be better to use mktemp for temp files)
 for ((i=1; i<=smax; i++)); do T[i]="$path/scr${i}cap-TMP.png";  done # Temporary
 for ((i=1; i<=smax; i++)); do H[i]="$path/scr${i}cap-HEAD.png"; done # Head
-for ((i=1; i<=smax; i++)); do C[i]="$path/scr${i}cap-$HM.webp"; done # arChived
+for ((i=1; i<=smax; i++)); do C[i]="$path/scr${i}cap-$HM.webp"; done # Compressd
 
 # Initialize the heads w/ placeholders iff they don't already exist
-for ((i=1; i<=smax; i++)); do $(genpim $i ${H[$i]}); done
+for ((i=1; i<=smax; i++)); do genpim ${H[$i]}; done
 
 # If we don't do this then we'll eventually have a fully 24 hours' worth:
-/bin/rm -f ${C[@]} # clean up previous captures -- optional
+#/bin/rm -f ${C[@]} # clean up previous captures -- optional
 
 if (( idle > freq * 10**9 )); then
   printf "idle over ${freq}s => skipping screencaps\n" >>$DBG
@@ -100,13 +99,17 @@ if (( idle > freq * 10**9 )); then
 fi
 
 # Grab a screenshot for every monitor (up to 4 currently; add more to taste)
+echo -n "S" >>$DBG
 $scap -x -r -T0 ${T[@]}
+echo -n ". " >>$DBG
 
 # Placeholders for any displays that failed to capture
-for ((i=1; i<=smax; i++)); do $(genpim $i ${T[$i]}); done
+for ((i=1; i<=smax; i++)); do genpim ${T[$i]}; done
 
 # Get the image diffs, tmp vs head
+echo -n "D" >>$DBG
 for ((i=1; i<=smax; i++)); do D[i]=$(imgdif ${T[$i]} ${H[$i]}); done
+echo -n ". " >>$DBG
 
 printf "fuzz%3s " "$fuzz" >>$DBG
 for ((i=1; i<=smax; i++)); do printf "%11s " "${D[i]}\\$i" >>$DBG; done
@@ -117,13 +120,18 @@ for ((i=1; i<=smax; i++)); do printf "%11s " "${D[i]}\\$i" >>$DBG; done
 # If no image difference, do nothing. 
 # Either way, blow away the tmp files before exit.
 # For the compression, see gensamples.sh for picking the webp settings.
+echo -n "C" >>$DBG
 args="-quality $imgq"
 for ((i=1; i<=smax; i++)); do
   if [ ${D[i]} -ne 0 ]; then 
+    echo -n "c" >>$DBG
     /bin/cp ${T[$i]} ${H[$i]}
+    echo -n "." >>$DBG
     $mick ${T[$i]} $args ${C[$i]}
+    echo -n ";" >>$DBG
   fi
 done
+echo -n "." >>$DBG
 
 /bin/rm -f -- "${T[@]}" # clean up the temp files
 
@@ -203,9 +211,9 @@ printf "\n" >>$DBG
 ##!/bin/bash
 # By dreev, documented at doc.dreev.es/screencap
 #
-#jq=20;  # jpeg quality (20 seems always readable, 10 not always for small fonts)
-#scap="/usr/sbin/screencapture";    # standard macOS screenshot tool
-#mogr="/opt/homebrew/bin/mogrify";  # part of ImageMagick for transforming images
+#jq=20; # jpeg quality (20 seems always readable, 10 not always for small fonts)
+#scap="/usr/sbin/screencapture";   # standard macOS screenshot tool
+#mogr="/opt/homebrew/bin/mogrify"; # part of ImageMagick for transforming images
 #path="/Users/dreeves/tmp/screenshots";  # where all the screenshots live
 #t=$(/bin/date +%s)                    # current time as unixtime
 #hm=$(/bin/date +%H-%M);            # eg "19-59" when it's 7:59pm

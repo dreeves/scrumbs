@@ -1,3 +1,21 @@
+<details style="cursor: pointer">
+<summary><i>Changelog</i></summary>
+<pre>
+2025-08-28: Add init.sh script
+2025-08-27: Cleanup and add some utility scripts
+2025-08-21: Automatically remove screencaps older than 24 hours
+2025-08-20: Use webp image format, auto-determine number of displays
+2025-08-19: Lots of refactoring and aborted wild ideas
+2025-08-17: Created github.com/dreeves/scrumbs
+2025-08-13: Added this changelog and improved the README a lot
+2024:       Added instructions to make it work on modern macOS
+2023ish:    Switched to Rewind.ai for a while
+2023ish:    This broke when I upgraded to macOS Catalina
+2017ish:    I originally wrote this
+</pre>
+</details>
+
+
 You know how sometimes a blog or web form eats your comment or you lose some text and break your undo history and you wish you could rewind and see what was on your screen some minutes or hours ago?
 I made a script to do that that has saved my butt more than once. 
 It's also handy for checking things like what time you left the office.
@@ -101,22 +119,6 @@ each[s_, Range[1, numscreens],
 prn["Files created: ", numcreated];
 ```
 
-<details style="cursor: pointer">
-<summary><i>Changelog</i></summary>
-<pre>
-2025-08-27: Cleanup and add some utility scripts
-2025-08-21: Automatically remove screencaps older than 24 hours
-2025-08-20: Use webp image format, auto-determine number of displays
-2025-08-19: Lots of refactoring and aborted wild ideas
-2025-08-17: Created github.com/dreeves/scrumbs
-2025-08-13: Added this changelog and improved the README a lot
-2024:       Added instructions to make it work on modern macOS
-2023ish:    Switched to Rewind.ai for a while
-2023ish:    This broke when I upgraded to macOS Catalina
-2017ish:    I originally wrote this
-</pre>
-</details>
-
 ## Scratch Area with Scattered Notes To Self
 
 There's something conceptually wrong here.
@@ -204,4 +206,26 @@ def cull_list(xs: List[float], G: float) -> List[float]:
       anchor = cur
   out.append(xs[-1])  # always keep the last element
   return out
+```
+
+PS:
+
+I think it's getting too compute-intensive to do the image diffs and compression
+every minute.
+I'm thinking we should have a simple loop, no cron, that makes the image 
+files -- `sNcap-HH-MM-SS.png` -- every so many seconds.
+Then separately, every so many minutes or hours, we do the following:
+1. Do the culling described above
+2. For the remaining images, delete any that are identical to their predecessors
+3. Convert .png files to .webp
+
+And maybe add day-of-the-week like so so the files sort correctly:
+```
+s1cap-1MO-23-59-59.png
+      2TU
+      3WE
+      4TH
+      5FR
+      6SA
+      7SU
 ```
