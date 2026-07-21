@@ -18,12 +18,14 @@ smax=3 # or use numdisplays() below
 mick="/opt/homebrew/bin/magick"    # ImageMagick can compress and compare images
 
 
+# unDRY warning: copied from crumbshot.sh
 # Query for the number of connected, online displays
 numdisplays() {
   /usr/sbin/system_profiler SPDisplaysDataType | /usr/bin/grep -c 'Online: Yes'
   # NB: this has returned 0 once or twice; could be safer to add retries?
 }
 
+# unDRY warning: adapted from crumbshot.sh
 # Generate a placeholder image if the file doesn't exist.
 # Returns 0 iff it created the file; non-zero otherwise.
 genpim() {
@@ -40,15 +42,15 @@ genpim() {
 numcreated=0
 echo "Screens: $smax"
 
-for ((d=1; d<=smax; d++)); do
-  for ((h=0; h<24; h++)); do
-    printf -v hh '%02d' "$h"
-    for ((m=0; m<60; m++)); do
-      printf -v mm '%02d' "$m"
+for ((h=0; h<24; h++)); do
+  printf -v hh '%02d' "$h"
+  for ((m=0; m<60; m++)); do
+    printf -v mm '%02d' "$m"
+    for ((d=1; d<=smax; d++)); do
       f="$path/scr${d}cap-${hh}-${mm}.webp"
       if [[ ! -e "$f" ]]; then
         if genpim "$f"; then
-          ((numcreated++))
+        ((numcreated++))
         fi
       fi
     done

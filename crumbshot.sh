@@ -24,9 +24,11 @@ numdisplays() {
 
 # Machine idle time in nanoseconds, ie how long since you touched keyboard/mouse
 idletime() {
-  echo $(/usr/sbin/ioreg -c IOHIDSystem | \
+  local ns=$(/usr/sbin/ioreg -c IOHIDSystem 2>/dev/null | \
     /usr/bin/awk '/HIDIdleTime/{print $NF;exit}')
-  # NB: Got this error once: "ioreg: error: can't obtain class". Add retries?
+  # Very rarely we get an error ("ioreg: error: can't obtain class") so we just
+  # default to zero in that case:
+  echo "${ns:-0}"
 }
 
 # Take a number of nanoseconds and format it like 4h20m59s
@@ -49,9 +51,10 @@ nanoHMS() {
 }
 
 # Generate a placeholder image for a display if the image file doesn't exist
+# See also init.sh which uses a nice lime green (#7FFF00) background.
 genpim() {
   local -r file=$1
-  local -a args=(-size 80x60 -background '#7FFF00' -gravity Center)
+  local -a args=(-size 80x60 -background cyan -gravity Center)
   local -r caption="(Screen inaccessible)"
   [[ -e "$file" ]] || { "$mick" "${args[@]}" "caption:$caption" "$file"; }
 }
@@ -98,9 +101,8 @@ if (( idle > freq * 10**9 )); then
   exit 0;
 fi
 
-# Grab a screenshot for every monitor (up to 4 currently; add more to taste)
 echo -n "S" >>$DBG
-$scap -x -r -T0 ${T[@]}
+$scap -x -r -T0 ${T[@]} # grab a screenshot for every monitor
 echo -n ". " >>$DBG
 
 # Placeholders for any displays that failed to capture

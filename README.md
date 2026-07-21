@@ -215,17 +215,18 @@ every minute.
 I'm thinking we should have a simple loop, no cron, that makes the image 
 files -- `sNcap-HH-MM-SS.png` -- every so many seconds.
 Then separately, every so many minutes or hours, we do the following:
-1. Do the culling described above
+1. Cull according to age and desired frequency as a function of age
 2. For the remaining images, delete any that are identical to their predecessors
+   (Or replace with a tiny image saying "same as previous")
 3. Convert .png files to .webp
 
 And maybe add day-of-the-week like so so the files sort correctly:
 ```
-s1cap-1MO-23-59-59.png
-      2TU
-      3WE
-      4TH
-      5FR
-      6SA
-      7SU
+scd1-1MO-23-59-59.png
+    -2TU-
+    -3WE-
+    -4TH-
+    -5FR-
+    -6SA-
+    -7SU-
 ```
