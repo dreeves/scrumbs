@@ -25,6 +25,17 @@ It stores them as images in a directory with filenames indicating the time of da
 That's effectively a circular buffer as screenshots that are 24 hours old get overwritten by new ones.
 That way you always have a record of what was on your screen(s) over the last 24 hours.
 
+## Notes for next thing to implement
+
+instead of all the ideas about culling and compressing, start with this:  
+  given a new screenshot like scd1-wed-13-54-53.png, first delete scd1-...-..-54-53.png, then save the screenshot  
+pretty similar to what we're currently doing but would make the filenames more useful than the current scd1-dow-hh-54-53.png  
+either way we're saving just the last hour of screenshots.  
+but maybe simpler is to just decide that hour or whatever cutoff and just have a sweeper deleting anything older than that, or if it's cheap enough, which it probably is, just do it as part of the crumbloop.  
+
+in which case, maybe just encode the full date/time in the filename?
+scd1-2026-07-23-THU-15-55-33.png
+
 ## Optimizations
 
 If the screenshot image for any display hasn't changed from the previous minute, it skips saving that image.
