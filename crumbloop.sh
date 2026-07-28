@@ -1,15 +1,23 @@
 #!/bin/bash
 # By Daniel Reeves. See https://github.com/dreeves/scrumbs
 # Version of crumbshot that runs in a loop, no cron.
+# Captures only. Culling, dedup, and compression happen in sweep.sh.
 
 #-------------------------------------------------------------------------------
 # Settings and Paths -----------------------------------------------------------
 #-------------------------------------------------------------------------------
 
-path="/Users/dreeves/scrumbs2"     # where all the screenshots live    [EDIT ME]
-freq=5                             # technically period; seconds betw screencaps
+srcdir=$(cd "$(dirname "$0")" && pwd)
+. "$srcdir/scrumblib.sh"
+. "${SCRUMBSCONF:-$srcdir/scrumbs.conf}"  # path & bands live in scrumbs.conf
+
 scap="/usr/sbin/screencapture"     # standard macOS command-line screenshot tool
 BIL=1000000000                     # a billion, 10^9, for nanoseconds conversion
+
+bandsparse "$bands"
+freq=${pers%% *}                   # capture period in seconds, from band 0
+swsec=$(parsedur "$sweepevery") || exit 1
+lastsweep=0                        # ensures a sweep right at startup
 
 #-------------------------------------------------------------------------------
 # Utility / Helper Functions ---------------------------------------------------
@@ -67,18 +75,35 @@ sleepytime() {
 # Main -------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 
+[[ -d $path ]] || die "no such directory: $path"
+
 fns=$(awk -v f="$freq" 'BEGIN{printf "%.0f\n", f*1e9}')    # freq in nanoseconds
+swns=$(awk -v s="$swsec" 'BEGIN{printf "%.0f\n", s*1e9}')  # ditto sweepevery
 # To be safe we'd get the number of displays inside the loop, since it can
 # change any time. But in practice it rarely does. Maybe it should recheck like
 # every minute?
-smax=$(numdisplays) 
+smax=$(numdisplays)
 [[ $smax -gt 0 ]] || { echo "ERROR: zero displays??"; exit 1; }
 
 while(true); do #---------------------------------------------------------------
 
-read -r ini mm ss < <(/opt/homebrew/bin/gdate '+%s%N %M %S')
-timetag=$(printf -- "dow-hh-%s-%s" "$mm" "$ss")
+# The tr uppercases the day-of-week, eg 2026-07-23-THU-15-55-33; digits are
+# untouched. This timetag is the one source of truth for the screenshot's
+# time -- sweep.sh parses it back and never trusts mtimes.
+read -r ini timetag < <(/opt/homebrew/bin/gdate '+%s%N %Y-%m-%d-%a-%H-%M-%S' | \
+                        /usr/bin/tr a-z A-Z)
 echo -n "$timetag "
+
+# Spawn a sweep every sweepevery, before the idle check -- files keep aging
+# across band boundaries whether or not new ones appear. It runs in the
+# background so a slow sweep never delays a capture, and its lock makes an
+# overrunning sweep die loudly (in sweep.log) rather than overlap.
+if (( ini - lastsweep >= swns )); then
+  echo -n "w "
+  "$srcdir/sweep.sh" >>"$path/sweep.log" 2>&1 &
+  lastsweep=$ini
+fi
+
 idle=$(idletime)
 printf "%7s " "~$(nanoHMS $idle)"
 
@@ -92,11 +117,11 @@ fi
 #[[ $smax -gt 0 ]] || { echo "ERROR: zero displays??"; sleepytime; continue; }
 printf "d%s " $smax
 
-for ((i=1; i<=smax; i++)); do X[i]="$path/scd${i}-$timetag.png";  done
+for ((i=1; i<=smax; i++)); do X[i]="$path/s$timetag-d${i}.jpg";  done
 
-# Grab a screenshot for every monitor (up to 4 currently; add more to taste)
+# Grab a screenshot for every monitor ie every connected display
 echo -n "S"
-$scap -x -r -T0 ${X[@]}
+$scap -x -r -T0 -tjpg ${X[@]}
 echo -n ". "
 
 sleepytime

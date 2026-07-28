@@ -25,26 +25,11 @@ It stores them as images in a directory with filenames indicating the time of da
 That's effectively a circular buffer as screenshots that are 24 hours old get overwritten by new ones.
 That way you always have a record of what was on your screen(s) over the last 24 hours.
 
-## Notes for next thing to implement
 
-instead of all the ideas about culling and compressing, start with this:  
-  given a new screenshot like scd1-wed-13-54-53.png, first delete scd1-...-..-54-53.png, then save the screenshot  
-pretty similar to what we're currently doing but would make the filenames more useful than the current scd1-dow-hh-54-53.png  
-either way we're saving just the last hour of screenshots.  
-but maybe simpler is to just decide that hour or whatever cutoff and just have a sweeper deleting anything older than that, or if it's cheap enough, which it probably is, just do it as part of the crumbloop.  
-
-in which case, maybe just encode the full date/time in the filename?
-scd1-2026-07-23-THU-15-55-33.png
-
-## Optimizations
-
-If the screenshot image for any display hasn't changed from the previous minute, it skips saving that image.
-Also if your machine has been idle since the last screenshot, it skips the screenshots for all displays, whether or not the screen has changed.
-
-We use lossy compression (jpeg or webp) and set the quality as low as possible without making any text unreadable.
-The whole collection of images should be at most around a gigabyte, even with huge external displays.
 
 ## Normal Usage
+
+TODO: file format changed
 
 After following the setup instructions below, here's everything you need to know to make use of this thing.
 Filenames are, e.g., "scr2cap-13-59.jpg" for a screencap of display 2 at 1:59pm.
@@ -54,6 +39,8 @@ You can skip forward to scr1cap-13-30.jpg to start at 1:30pm.
 Or just highlight whatever range of files in Finder and double click to open them all at once.
 
 ## Setup Instructions
+
+TODO: no more cron, just run crumbloop.sh
 
 This assumes some command-line savviness.
 Roughly you're setting up the Bash script crumbshot.sh to run every minute in the background.
@@ -241,3 +228,11 @@ scd1-1MO-23-59-59.png
     -6SA-
     -7SU-
 ```
+
+## Old Optimizations, now part of the main loop but not every cycle...
+
+If the screenshot image for any display hasn't changed from the previous minute, it skips saving that image.
+Also if your machine has been idle since the last screenshot, it skips the screenshots for all displays, whether or not the screen has changed.
+
+We use lossy compression (jpeg or webp) and set the quality as low as possible without making any text unreadable.
+The whole collection of images should be at most around a gigabyte, even with huge external displays.

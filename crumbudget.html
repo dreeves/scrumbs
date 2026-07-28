@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="und">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8D%9E%3C/text%3E%3C/svg%3E">
+<title>crumbudget — by Claude Fable 5</title>
+<style>
+/* Beeminder hive theme, matching sourcery.html: honey paper by day, warm
+   black by night, goldenrod accents. */
+:root {
+  color-scheme: light dark;
+  --bg: #faf0d8;
+  --ink: #1c1508;
+  --muted: #77673f;
+  --line: #eadbb4;
+  --accent: #a97b00;
+  --bad: #cf222e;
+  /* Age-band ramp, newest to oldest, light to dark. Ordinal single-hue ramp
+     validated against this mode's surface (monotone L, adjacent dL >= 0.06,
+     light end >= 2:1 contrast). */
+  --band1: #d2a01c;
+  --band2: #b1861a;
+  --band3: #906c00;
+  --band4: #715300;
+  --band5: #533b00;
+  --sans: ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16130f;
+    --ink: #ece2cc;
+    --muted: #a3946f;
+    --line: #2d2718;
+    --accent: #ffb300;
+    --bad: #f85149;
+    --band1: #ffd76b;
+    --band2: #ffb300;
+    --band3: #cf8f00;
+    --band4: #9f6c00;
+    --band5: #6f4a00;
+  }
+}
+body {
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  max-width: 40rem;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.5;
+}
+h1 { font-size: 1.4rem; margin: 0; }
+h1 + p { margin-top: .25rem; color: var(--muted); }
+label { color: var(--muted); font-size: .85rem; }
+input[type=number], select {
+  font: inherit; font-family: var(--mono); font-size: .85rem;
+  color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: .15rem .3rem;
+}
+#knobs { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; margin: 1.25rem 0; }
+#knobs > div { display: flex; flex-direction: column; gap: .15rem; }
+
+#barwrap { position: relative; margin: 1.5rem 0 .5rem; }
+#track {
+  height: 28px; border-radius: 4px; background: var(--line);
+  overflow: hidden; display: flex; gap: 2px;
+}
+#track .seg:first-child { border-radius: 4px 0 0 4px; }
+#tick {
+  position: absolute; top: -6px; bottom: -6px; width: 2px;
+  background: var(--ink);
+}
+#tick span {
+  position: absolute; top: -1.1rem; left: -0.5ch;
+  font-size: .7rem; color: var(--muted); font-family: var(--mono);
+}
+#verdict { margin: 1rem 0; }
+#verdict.over { color: var(--bad); font-weight: bold; }
+
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+th { text-align: left; color: var(--muted); font-weight: normal;
+     font-size: .8rem; border-bottom: 1px solid var(--line); }
+th, td { padding: .3rem .6rem .3rem 0; }
+td { font-family: var(--mono); font-size: .85rem; }
+td.num { text-align: right; }
+th.num { text-align: right; }
+.swatch { display: inline-block; width: 12px; height: 12px;
+          border-radius: 3px; margin-right: .5ch; vertical-align: -1px; }
+
+#conf { margin-top: 1.5rem; }
+#confline {
+  font-family: var(--mono); font-size: .85rem; display: block;
+  padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 4px;
+  overflow-x: auto; white-space: nowrap;
+}
+/* Config line grays out, rather than disappearing, when bands are invalid */
+#conf.invalid #confline { opacity: .35; text-decoration: line-through; }
+button {
+  font: inherit; font-size: .85rem; margin-top: .5rem;
+  color: var(--accent); background: none;
+  border: 1px solid var(--accent); border-radius: 4px; padding: .2rem .8rem;
+}
+#alarm {
+  display: none; margin: 1rem 0; padding: .5rem .75rem;
+  border: 2px solid var(--bad); border-radius: 4px; color: var(--bad);
+}
+#alarm.on { display: block; }
+</style>
+</head>
+<body>
+
+<h1>crumbudget</h1>
+<p>Disk-space budgeter for scrumbs — written by Claude Fable 5</p>
+
+<div id="alarm"></div>
+
+<div id="knobs">
+  <div>
+    <label for="budget">Space allowance (GB)</label>
+    <input type="number" id="budget" value="5" min="0.1" step="0.5">
+  </div>
+  <div>
+    <!-- idle time generates no screenshots, hence this discount -->
+    <label for="occup">Time in active use (%)</label>
+    <input type="number" id="occup" value="50" min="1" max="100" step="5">
+  </div>
+  <div>
+    <!-- one capture moment = all displays; 2.9 MB measured across 3 -->
+    <label for="jpgmb">jpg size per moment (MB)</label>
+    <input type="number" id="jpgmb" value="2.9" min="0.1" step="0.1">
+  </div>
+  <div>
+    <!-- ~700 KB measured across 3 displays at webp quality 20 -->
+    <label for="webpkb">webp size per moment (KB)</label>
+    <input type="number" id="webpkb" value="700" min="10" step="10">
+  </div>
+</div>
+
+<div id="barwrap">
+  <div id="track"></div>
+  <div id="tick"><span>limit</span></div>
+</div>
+
+<p id="verdict"></p>
+
+<table>
+  <thead><tr>
+    <th>Age</th><th>Period</th>
+    <th class="num">Images</th><th class="num">Space</th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+  <tfoot><tr>
+    <td>Total</td><td></td>
+    <td class="num" id="totimg"></td><td class="num" id="totgb"></td>
+  </tr></tfoot>
+</table>
+
+<div id="conf">
+  <label>Paste into scrumbs.conf:</label>
+  <code id="confline"></code>
+  <button id="copy">Copy</button>
+</div>
+
+<script>
+"use strict";
+
+const SEC = { s: 1, m: 60, h: 3600, d: 86400, w: 604800, y: 31536000 };
+
+// Fixed band edges; only the keep-periods are tunable. The last edge is the
+// horizon: nothing is kept longer than a year.
+const EDGES = [
+  { label: "0–1h",   upto: 3600     },
+  { label: "1h–1d",  upto: 86400    },
+  { label: "1d–7d",  upto: 604800   },
+  { label: "7d–30d", upto: 2592000  },
+  { label: "30d–1y", upto: 31536000 },
+];
+const EDGETOK = ["1h", "1d", "7d", "30d", "1y"];
+const PERIODS = ["1s","2s","5s","10s","15s","30s","1m","2m","5m","10m",
+                 "15m","30m","1h","2h","3h","6h","12h","1d"];
+const DEFAULTS = ["5s","1m","5m","1h","1d"];
+
+function parsedur(tok) {
+  const m = /^([0-9]+)([smhdwy])$/.exec(tok);
+  affirm(m !== null, `unparseable duration: ${tok}`);
+  return Number(m[1]) * SEC[m[2]];
+}
+
+// Per-band byte totals. Band 0 is raw jpg as captured; older bands are webp.
+function bandbytes(periods, jpgb, webpb, occup) {
+  return EDGES.map((e, i) => {
+    const span = e.upto - (i === 0 ? 0 : EDGES[i-1].upto);
+    const moments = span / parsedur(periods[i]);
+    return moments * (i === 0 ? jpgb : webpb) * occup;
+  });
+}
+
+function affirm(cond, msg) {
+  if (cond) return;
+  const alarm = document.getElementById("alarm");
+  alarm.textContent = `Self-check failed: ${msg}`;
+  alarm.classList.add("on");
+  throw new Error(msg);
+}
+
+// Quals. Expected values hand-computed from the measured sizes.
+(function quals() {
+  affirm(parsedur("5s") === 5 && parsedur("1y") === 31536000,
+         "parsedur");
+  const b = bandbytes(DEFAULTS, 2.9e6, 750e3, 1);
+  const want = [2.088e9, 1.035e9, 1.296e9, 4.14e8, 2.5125e8];
+  b.forEach((x, i) =>
+    affirm(Math.abs(x - want[i]) < 1e3, `bandbytes[${i}] = ${x}`));
+  const tot = b.reduce((a, x) => a + x, 0);
+  affirm(Math.abs(tot - 5.08425e9) < 1e4, `summa = ${tot}`);
+})();
+
+const rows = document.getElementById("rows");
+const sels = EDGES.map((e, i) => {
+  const tr = document.createElement("tr");
+  const sel = document.createElement("select");
+  PERIODS.forEach(p => sel.add(new Option(p, p)));
+  sel.value = DEFAULTS[i];
+  sel.addEventListener("input", render);
+  tr.innerHTML = `<td><span class="swatch" style="background:var(--band${i+1})"></span>${e.label}</td>` +
+                 `<td></td><td class="num"></td><td class="num"></td>`;
+  tr.children[1].append(sel);
+  rows.append(tr);
+  return sel;
+});
+
+const track = document.getElementById("track");
+const segs = EDGES.map((e, i) => {
+  const d = document.createElement("div");
+  d.className = "seg";
+  d.style.background = `var(--band${i+1})`;
+  track.append(d);
+  return d;
+});
+
+function gb(bytes) { return (bytes / 1e9).toFixed(2) + " GB"; }
+function num(id) { return Number(document.getElementById(id).value); }
+
+function render() {
+  const periods = sels.map(s => s.value);
+  const conf = document.getElementById("conf");
+  const noninc = periods.some((p, i) =>
+    i > 0 && parsedur(p) < parsedur(periods[i-1]));
+  const alarm = document.getElementById("alarm");
+  conf.classList.toggle("invalid", noninc);
+  alarm.classList.toggle("on", noninc);
+  if (noninc) {
+    alarm.textContent =
+      "Keep-periods may not decrease: older age bands need equal or " +
+      "longer periods than younger ones.";
+  }
+
+  const bytes = bandbytes(periods, num("jpgmb") * 1e6, num("webpkb") * 1e3,
+                          num("occup") / 100);
+  const imgs = EDGES.map((e, i) =>
+    (e.upto - (i === 0 ? 0 : EDGES[i-1].upto)) / parsedur(periods[i]));
+  const total = bytes.reduce((a, x) => a + x, 0);
+  const budget = num("budget") * 1e9;
+  const scale = Math.max(total, budget);
+
+  EDGES.forEach((e, i) => {
+    const tds = rows.children[i].children;
+    tds[2].textContent = Math.round(imgs[i]).toLocaleString("en-US");
+    tds[3].textContent = gb(bytes[i]);
+    segs[i].style.width = `calc(${100 * bytes[i] / scale}% - 2px)`;
+    segs[i].title = `${e.label}: ${periods[i]}, ${gb(bytes[i])}`;
+  });
+  document.getElementById("totimg").textContent =
+    Math.round(imgs.reduce((a, x) => a + x, 0)).toLocaleString("en-US");
+  document.getElementById("totgb").textContent = gb(total);
+  document.getElementById("tick").style.left = `${100 * budget / scale}%`;
+
+  const verdict = document.getElementById("verdict");
+  verdict.classList.toggle("over", total > budget);
+  verdict.textContent = total > budget
+    ? `Over the space allowance by ${gb(total - budget)}.`
+    : `Within the space allowance, ${gb(budget - total)} to spare.`;
+
+  document.getElementById("confline").textContent =
+    `bands="${EDGETOK.map((t, i) => `${t}:${periods[i]}`).join(" ")}"`;
+}
+
+["budget", "occup", "jpgmb", "webpkb"].forEach(id =>
+  document.getElementById(id).addEventListener("input", render));
+
+document.getElementById("copy").addEventListener("click", () => {
+  navigator.clipboard.writeText(
+    document.getElementById("confline").textContent
+  ).then(() => {
+    document.getElementById("copy").textContent = "Copied.";
+  }, err => affirm(false, `copy failed: ${err}`));
+});
+
+render();
+</script>
+</body>
+</html>
