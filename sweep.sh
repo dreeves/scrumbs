@@ -52,7 +52,9 @@ imgdif() {
 [[ -d $path ]] || die "no such directory: $path"
 bandsparse "$bands"
 edge0=${edges%% *}                 # raw band boundary in seconds: jpgs older
-                                   # than this get deduped/compressed
+                                   # than this get deduped/compressed; finite
+                                   # by construction (bandsparse wants >= 2
+                                   # bands and lets only the last be inf)
 now=$(localnow)
 
 # Allow only one sweep at a time. (A stale lock after a crash needs removing

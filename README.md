@@ -25,34 +25,39 @@ It stores them as images in a directory with filenames indicating the time of da
 That's effectively a circular buffer as screenshots that are 24 hours old get overwritten by new ones.
 That way you always have a record of what was on your screen(s) over the last 24 hours.
 
+## Ideas of things to do next
 
+Make the crumbudget tool more obvious and have it use data from sweep.log 
+
+Invariant: The sweeper/compressor never removes the oldest screenshot. 
 
 ## Normal Usage
 
-TODO: file format changed
-
 After following the setup instructions below, here's everything you need to know to make use of this thing.
-Filenames are, e.g., "scr2cap-13-59.jpg" for a screencap of display 2 at 1:59pm.
+Filenames are, e.g., "s2026-08-18-TUE-13-59-01-d2.jpg" for a screencap of display 2 at 1:59pm.
 Say it's now 2:30pm and you want to see what was on your primary display in the last hour.
-By running `open scr1cap-1[34]*` you can flip through everything starting at 1pm in Preview.app or whatever your default image viewer is.
-You can skip forward to scr1cap-13-30.jpg to start at 1:30pm.
+By running `open s2026-08-18-TUE-1[34]*` you can flip through everything starting at 1pm in Preview.app or whatever your default image viewer is.
+You can skip forward to s2026-08-18-TUE-13-30-00.jpg to start at 1:30pm.
 Or just highlight whatever range of files in Finder and double click to open them all at once.
 
 ## Setup Instructions
 
-TODO: no more cron, just run crumbloop.sh
+1. Create a directory for the screenshots to live, like `~/scrumbs`.
+1. Edit settings and paths in scrumbs.conf
+1. Run the following to install ImageMagick (used to compare and compress the image files):  
+`brew install imagemagick`
+1. (Maybe some macOS Privacy & Security things; see old cron instructions below)
+1. Then just run crumbloop.sh in the background or in a dedicated terminal.
 
-This assumes some command-line savviness.
-Roughly you're setting up the Bash script crumbshot.sh to run every minute in the background.
+
+Old cron-based instructions now obviated by crumbloop.sh:
+
+This sets up the Bash script crumbshot.sh to run every minute in the background.
 That should be a pretty negligible use of your machine's resources.
 
 Doing all this once will make scrumbs run indefinitely, including after rebooting your machine.
 
-1. Create a directory for the screenshots to live, like `~/scrumbs`.
 1. Put the crumbshot script somewhere on your machine, say `~/bin/crumbshot.sh`.
-1. Run the following to install ImageMagick (used to compare and compress the image files):  
-`brew install imagemagick`
-1. Edit the paths in the script as needed (you'll definitely need to edit where it says "EDIT ME").
 1. Run the the following to make it executable:  
 `chmod a+x ~/bin/crumbshot.sh`
 1. Add a line like the following to your cronfile.
@@ -64,7 +69,7 @@ Typically you edit your cronfile with `crontab -e`.
 1. Also in Privacy & Security settings, give Screen & System Audio Recording permission to:  
 `/usr/sbin/cron`  
 
-## Alternatives, courtesy of GPT-5
+## Off-the-Shelf Alternatives, gathered by GPT-5
 
 | Tool                       | Type                                          | Multi-display support                              | Rolling buffer behavior                                | Cost                               | Notable bits                          | Source                                           |
 | -------------------------- | --------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- | ------------------------------------- | ------------------------------------------------ |
@@ -94,6 +99,8 @@ Typically you edit your cronfile with `crontab -e`.
 
 
 ## Optional Quantified-Self Thing
+
+NOTE: This doesn't work with the new file format.
 
 Separately, here's a bit of Wolfram code to touch all possible `24*60*numscreens` files, if you don't want missing files when the display is off.
 It's safe to run any time -- it only touches files that don't exist. 
@@ -173,7 +180,7 @@ keeper(sc)
 
 Or walk forward in time starting from the oldest file.
 Initialize the previous timestamp, pt, to -infinity.
-For each file, i, use i's age to determined the desired freq.
+For each file, i, use i's age to determine the desired freq.
 Then delete i if the delta from pt is less than that freq.
 If we don't delete it, let pt = i.timestamp.
 Continue to the next oldest file.
@@ -206,28 +213,28 @@ def cull_list(xs: List[float], G: float) -> List[float]:
   return out
 ```
 
+Another attempt at articulating the culling algorithm:
+
+Say you want daily screenshots between 30d and 1y old.
+Conceptually we want a sliding window, 1 day wide, that starts with its left edge at 1 year old and slides forward till its right edge hits one month old.
+As that window slides forward, at every moment we want to throw away all but the earliest and latest screenshot in the window.
+
+(I'm trying to think through the algorithm that's provably maximally conservative. If there are 3 screenshots all within the 1-day window then it never hurts to remove the middle one. But if there are 2 then we can't be locally sure it's ok to remove either of them.)
+
 PS:
 
 I think it's getting too compute-intensive to do the image diffs and compression
 every minute.
-I'm thinking we should have a simple loop, no cron, that makes the image 
-files -- `sNcap-HH-MM-SS.png` -- every so many seconds.
+I'm thinking we should have a simple loop, no cron, that makes the image files
+every so many seconds.
 Then separately, every so many minutes or hours, we do the following:
 1. Cull according to age and desired frequency as a function of age
 2. For the remaining images, delete any that are identical to their predecessors
    (Or replace with a tiny image saying "same as previous")
 3. Convert .png files to .webp
 
-And maybe add day-of-the-week like so so the files sort correctly:
-```
-scd1-1MO-23-59-59.png
-    -2TU-
-    -3WE-
-    -4TH-
-    -5FR-
-    -6SA-
-    -7SU-
-```
+
+PS: Much of the above is moot now that we encode the fully YYYY-MM-DD-HH-MM-SS timestamp in the screenshot filename.
 
 ## Old Optimizations, now part of the main loop but not every cycle...
 

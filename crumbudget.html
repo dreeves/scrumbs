@@ -1,202 +1,227 @@
 <!doctype html>
-<html lang="und">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="light">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8D%9E%3C/text%3E%3C/svg%3E">
 <title>crumbudget — by Claude Fable 5</title>
 <style>
-/* Beeminder hive theme, matching sourcery.html: honey paper by day, warm
-   black by night, goldenrod accents. */
+/* System 7: a movable modal dialog on the dithered desktop. Geneva for words,
+   Monaco for numbers, square corners, black rules; the chrome stays one-bit
+   and color is reserved for the data, the way System 7 kept its desktop gray
+   and spent color on label tags. No dark mode -- 1987 didn't have one.
+
+   Sizes are in rem, never px, so raising the browser's font size raises this
+   page with it (WCAG 2.2 SC 1.4.4). Nothing is smaller than 1rem, ie the 16px
+   browser default, and line-height is 1.5, the figure SC 1.4.12 names. System 7
+   itself was drawn for 72dpi screens, so its 9pt and 12pt bitmaps land at
+   roughly double that here; the rules and borders are doubled to match, the way
+   an emulator pixel-doubles the whole screen. */
 :root {
-  color-scheme: light dark;
-  --bg: #faf0d8;
-  --ink: #1c1508;
-  --muted: #77673f;
-  --line: #eadbb4;
-  --accent: #a97b00;
-  --bad: #cf222e;
-  /* Age-band ramp, newest to oldest, light to dark. Ordinal single-hue ramp
-     validated against this mode's surface (monotone L, adjacent dL >= 0.06,
-     light end >= 2:1 contrast). */
-  --band1: #d2a01c;
-  --band2: #b1861a;
-  --band3: #906c00;
-  --band4: #715300;
-  --band5: #533b00;
-  --sans: ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+  --ink: #000;
+  --paper: #fff;
+  --face: #dcdcdc;                 /* the gray of a dialog's title strip */
+  --rule: 2px;                     /* one 72dpi hairline, doubled */
+  --sans: Geneva, Verdana, "DejaVu Sans", sans-serif;
+  --mono: Monaco, "Courier New", monospace;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #16130f;
-    --ink: #ece2cc;
-    --muted: #a3946f;
-    --line: #2d2718;
-    --accent: #ffb300;
-    --bad: #f85149;
-    --band1: #ffd76b;
-    --band2: #ffb300;
-    --band3: #cf8f00;
-    --band4: #9f6c00;
-    --band5: #6f4a00;
-  }
-}
+* { box-sizing: border-box; }
 body {
-  margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
-  max-width: 40rem;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--sans);
-  line-height: 1.5;
+  margin: 0; padding: 2.5rem 1rem 4rem; min-height: 100vh;
+  color: var(--ink); font: 1.125rem/1.5 var(--sans);
+  /* the desktop pattern: a 2px checkerboard of two grays, ie 50% dither */
+  background: repeating-conic-gradient(#9d9d9d 0 25%, #7d7d7d 0 50%) 0 0/4px 4px;
 }
-h1 { font-size: 1.4rem; margin: 0; }
-h1 + p { margin-top: .25rem; color: var(--muted); }
-label { color: var(--muted); font-size: .85rem; }
-input[type=number], select {
-  font: inherit; font-family: var(--mono); font-size: .85rem;
-  color: var(--ink); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 4px; padding: .15rem .3rem;
+.window {
+  max-width: 46rem; margin: 0 auto;
+  background: var(--paper); border: var(--rule) solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, .5);
 }
-#knobs { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; margin: 1.25rem 0; }
-#knobs > div { display: flex; flex-direction: column; gap: .15rem; }
+/* Six doubled hairlines across the bar, title knocked out in the middle */
+.titlebar {
+  display: flex; align-items: center; justify-content: center; height: 2.25rem;
+  border-bottom: var(--rule) solid var(--ink);
+  background: repeating-linear-gradient(180deg,
+              var(--ink) 0 2px, var(--paper) 2px 6px);
+}
+.titlebar span { background: var(--paper); padding: 0 .75rem; font-weight: bold; }
+.content { padding: 1.25rem 1.5rem 1.5rem; }
+.byline { margin: 0 0 1.25rem; font-size: 1rem; }
 
-#barwrap { position: relative; margin: 1.5rem 0 .5rem; }
-#track {
-  height: 28px; border-radius: 4px; background: var(--line);
-  overflow: hidden; display: flex; gap: 2px;
-}
-#track .seg:first-child { border-radius: 4px 0 0 4px; }
-#tick {
-  position: absolute; top: -6px; bottom: -6px; width: 2px;
-  background: var(--ink);
-}
-#tick span {
-  position: absolute; top: -1.1rem; left: -0.5ch;
-  font-size: .7rem; color: var(--muted); font-family: var(--mono);
-}
-#verdict { margin: 1rem 0; }
-#verdict.over { color: var(--bad); font-weight: bold; }
-
-table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-th { text-align: left; color: var(--muted); font-weight: normal;
-     font-size: .8rem; border-bottom: 1px solid var(--line); }
-th, td { padding: .3rem .6rem .3rem 0; }
-td { font-family: var(--mono); font-size: .85rem; }
-td.num { text-align: right; }
-th.num { text-align: right; }
-.swatch { display: inline-block; width: 12px; height: 12px;
-          border-radius: 3px; margin-right: .5ch; vertical-align: -1px; }
-
-#conf { margin-top: 1.5rem; }
-#confline {
-  font-family: var(--mono); font-size: .85rem; display: block;
-  padding: .5rem .75rem; border: 1px solid var(--line); border-radius: 4px;
-  overflow-x: auto; white-space: nowrap;
-}
-/* Config line grays out, rather than disappearing, when bands are invalid */
-#conf.invalid #confline { opacity: .35; text-decoration: line-through; }
-button {
-  font: inherit; font-size: .85rem; margin-top: .5rem;
-  color: var(--accent); background: none;
-  border: 1px solid var(--accent); border-radius: 4px; padding: .2rem .8rem;
-}
 #alarm {
-  display: none; margin: 1rem 0; padding: .5rem .75rem;
-  border: 2px solid var(--bad); border-radius: 4px; color: var(--bad);
+  display: none; margin: 0 0 1.25rem; padding: .6rem .8rem;
+  border: calc(var(--rule) * 2) solid var(--ink);
+  background: var(--face); font-weight: bold;
 }
 #alarm.on { display: block; }
+
+fieldset {
+  margin: 0 0 1.4rem; padding: .6rem 1rem .9rem;
+  border: var(--rule) solid var(--ink);
+}
+legend { padding: 0 .5rem; font-size: 1rem; font-weight: bold; }
+#facts { display: grid; grid-template-columns: auto 1fr; gap: .15rem 2ch; margin: 0; }
+#facts dt { font-size: 1rem; }
+#facts dd { margin: 0; font: 1rem/1.5 var(--mono); }
+.note { margin: .75rem 0 0; font-size: 1rem; }
+
+.field { display: flex; align-items: center; gap: 1ch; margin: 0 0 1.4rem; }
+input {
+  font: 1rem/1.5 var(--mono); color: var(--ink); background: var(--paper);
+  border: var(--rule) solid var(--ink); border-radius: 0; padding: .1rem .4rem;
+}
+input:focus { outline: var(--rule) solid var(--ink); outline-offset: 2px; }
+#budget { width: 7ch; text-align: right; }
+#conf { margin: 0 0 1.4rem; }
+#conf label { display: block; font-size: 1rem; margin-bottom: .3rem; }
+#bandsline { display: block; width: 100%; padding: .4rem .6rem; }
+/* spinners are anachronistic */
+input::-webkit-inner-spin-button, input::-webkit-outer-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+
+#barwrap { display: flex; gap: 1ch; margin: 2.25rem 0 1.4rem; }
+#barlabs {
+  display: flex; flex-direction: column; gap: .5rem;
+  font-size: 1rem; text-align: right;
+}
+#barlabs span { line-height: 1.75rem; }
+#tracks {
+  position: relative; flex: 1;
+  display: flex; flex-direction: column; gap: .5rem;
+}
+.track {
+  display: flex; height: 1.75rem; overflow: hidden;
+  border: var(--rule) solid var(--ink); background: var(--paper);
+}
+.seg + .seg { border-left: var(--rule) solid var(--ink); }
+#tick {
+  position: absolute; top: -.6rem; bottom: -.6rem; width: 3px;
+  background: var(--ink); box-shadow: 0 0 0 2px var(--paper);
+  cursor: ew-resize; touch-action: none;
+}
+/* an invisible grab margin, so the 3px line isn't the whole drag target */
+#tick::after {
+  content: ""; position: absolute; top: 0; bottom: 0;
+  left: -.5rem; right: -.5rem;
+}
+#tick span {
+  position: absolute; top: -1.6rem; left: -1.5ch;
+  padding: 0 .25rem; font-size: 1rem; background: var(--paper);
+}
+
+table {
+  width: 100%; margin: 0 0 1.4rem;
+  border: var(--rule) solid var(--ink); border-collapse: collapse;
+}
+th, td { padding: .3rem .75rem; }
+th {
+  font-size: 1rem; text-align: left; background: var(--face);
+  border-bottom: var(--rule) solid var(--ink);
+}
+td { font: 1rem/1.5 var(--mono); }
+td:first-child { font: 1rem/1.5 var(--sans); }
+.num { text-align: right; }
+tfoot td { border-top: var(--rule) solid var(--ink); font-weight: bold; }
+.swatch {
+  display: inline-block; width: 1.125rem; height: 1.125rem;
+  margin-right: .5rem; vertical-align: -.2rem;
+  border: var(--rule) solid var(--ink);
+}
+
+#verdict { margin: 0 0 1.4rem; }
+#verdict.over {
+  display: inline-block; padding: .15rem .5rem;
+  background: var(--ink); color: var(--paper); font-weight: bold;
+}
+
+/* stale numbers stay put and gray out while the conf line is unusable */
+body.stale #barwrap, body.stale table, body.stale #verdict { opacity: .35; }
 </style>
 </head>
 <body>
 
-<h1>crumbudget</h1>
-<p>Disk-space budgeter for scrumbs — written by Claude Fable 5</p>
+<div class="window">
+<div class="titlebar"><span>crumbudget</span></div>
+<div class="content">
+
+<p class="byline">Disk-space budgeter for scrumbs — written by Claude Fable 5</p>
 
 <div id="alarm"></div>
 
-<div id="knobs">
-  <div>
-    <label for="budget">Space allowance (GB)</label>
-    <input type="number" id="budget" value="5" min="0.1" step="0.5">
-  </div>
-  <div>
-    <!-- idle time generates no screenshots, hence this discount -->
-    <label for="occup">Time in active use (%)</label>
-    <input type="number" id="occup" value="50" min="1" max="100" step="5">
-  </div>
-  <div>
-    <!-- one capture moment = all displays; 2.9 MB measured across 3 -->
-    <label for="jpgmb">jpg size per moment (MB)</label>
-    <input type="number" id="jpgmb" value="2.9" min="0.1" step="0.1">
-  </div>
-  <div>
-    <!-- ~700 KB measured across 3 displays at webp quality 20 -->
-    <label for="webpkb">webp size per moment (KB)</label>
-    <input type="number" id="webpkb" value="700" min="10" step="10">
-  </div>
+<!-- The conf line is the one input: edit it in place, paste it into
+     scrumbs.conf when the implications below look right. -->
+<div id="conf">
+  <label for="bandsline">Paste into scrumbs.conf:</label>
+  <input id="bandsline" spellcheck="false" autocomplete="off">
 </div>
+
+<p class="field">
+  <label for="budget">Space allowance (GB)</label>
+  <input type="number" id="budget" value="5" min="0.1" step="0.1">
+</p>
 
 <div id="barwrap">
-  <div id="track"></div>
-  <div id="tick"><span>limit</span></div>
+  <!-- the two row labels say what each bar is: the top track is what
+       the screenshot directory holds today, the bottom what the typed bands
+       line settles at -->
+  <div id="barlabs"><span>On disk</span><span>Projected</span></div>
+  <div id="tracks">
+    <div id="nowtrack" class="track"></div>
+    <div id="projtrack" class="track"></div>
+    <div id="tick"><span>limit</span></div>
+  </div>
 </div>
-
-<p id="verdict"></p>
 
 <table>
   <thead><tr>
-    <th>Age</th><th>Period</th>
-    <th class="num">Images</th><th class="num">Space</th>
+    <th rowspan="2">Age</th><th rowspan="2">Period</th>
+    <th class="num" colspan="2">Moments</th>
+    <th class="num" colspan="2">Space</th>
+  </tr><tr>
+    <!-- the subheads split both sacred headers the same way, into the
+         measured column and the modeled column, so no model number can read
+         as a measurement -->
+    <th class="num">On disk</th><th class="num">Projected</th>
+    <th class="num">On disk</th><th class="num">Projected</th>
   </tr></thead>
   <tbody id="rows"></tbody>
   <tfoot><tr>
     <td>Total</td><td></td>
-    <td class="num" id="totimg"></td><td class="num" id="totgb"></td>
+    <td class="num" id="totmomnow"></td><td class="num" id="totmom"></td>
+    <td class="num" id="totnow"></td><td class="num" id="totgb"></td>
   </tr></tfoot>
 </table>
 
-<div id="conf">
-  <label>Paste into scrumbs.conf:</label>
-  <code id="confline"></code>
-  <button id="copy">Copy</button>
+<p id="verdict"></p>
+
+<fieldset>
+  <!-- this panel reports what crumbudget.sh found on disk, rather than
+       asking the reader to guess at per-screenshot sizes the way it used to -->
+  <legend>Measured from the screenshots on disk</legend>
+  <dl id="facts">
+    <dt>History on disk</dt>          <dd id="f-span"></dd>
+    <dt>Size per raw moment</dt>      <dd id="f-jpg"></dd>
+    <dt>Size per archived moment</dt> <dd id="f-webp"></dd>
+    <dt>Capture slots filled</dt>     <dd id="f-occup"></dd>
+  </dl>
+  <p class="note">A moment is one capture instant across every display. Slots go
+  empty while the machine is idle, and the sweeper deletes an archived
+  screenshot that is identical to the one before it, so everything above is
+  scaled by the fraction of slots that actually hold a screenshot.</p>
+</fieldset>
+
+</div>
 </div>
 
+<script src="crumbudget.data.js"></script>
 <script>
 "use strict";
 
 const SEC = { s: 1, m: 60, h: 3600, d: 86400, w: 604800, y: 31536000 };
-
-// Fixed band edges; only the keep-periods are tunable. The last edge is the
-// horizon: nothing is kept longer than a year.
-const EDGES = [
-  { label: "0–1h",   upto: 3600     },
-  { label: "1h–1d",  upto: 86400    },
-  { label: "1d–7d",  upto: 604800   },
-  { label: "7d–30d", upto: 2592000  },
-  { label: "30d–1y", upto: 31536000 },
-];
-const EDGETOK = ["1h", "1d", "7d", "30d", "1y"];
-const PERIODS = ["1s","2s","5s","10s","15s","30s","1m","2m","5m","10m",
-                 "15m","30m","1h","2h","3h","6h","12h","1d"];
-const DEFAULTS = ["5s","1m","5m","1h","1d"];
-
-function parsedur(tok) {
-  const m = /^([0-9]+)([smhdwy])$/.exec(tok);
-  affirm(m !== null, `unparseable duration: ${tok}`);
-  return Number(m[1]) * SEC[m[2]];
-}
-
-// Per-band byte totals. Band 0 is raw jpg as captured; older bands are webp.
-function bandbytes(periods, jpgb, webpb, occup) {
-  return EDGES.map((e, i) => {
-    const span = e.upto - (i === 0 ? 0 : EDGES[i-1].upto);
-    const moments = span / parsedur(periods[i]);
-    return moments * (i === 0 ? jpgb : webpb) * occup;
-  });
-}
+const DUR = /^([1-9][0-9]*)([smhdwy])$/;   // zero is no duration
 
 function affirm(cond, msg) {
   if (cond) return;
@@ -206,97 +231,328 @@ function affirm(cond, msg) {
   throw new Error(msg);
 }
 
-// Quals. Expected values hand-computed from the measured sizes.
-(function quals() {
-  affirm(parsedur("5s") === 5 && parsedur("1y") === 31536000,
-         "parsedur");
-  const b = bandbytes(DEFAULTS, 2.9e6, 750e3, 1);
-  const want = [2.088e9, 1.035e9, 1.296e9, 4.14e8, 2.5125e8];
-  b.forEach((x, i) =>
-    affirm(Math.abs(x - want[i]) < 1e3, `bandbytes[${i}] = ${x}`));
-  const tot = b.reduce((a, x) => a + x, 0);
-  affirm(Math.abs(tot - 5.08425e9) < 1e4, `summa = ${tot}`);
-})();
+function parsedur(tok) {
+  if (tok === "inf") return Infinity;   // legal only as the last max-age
+  const m = DUR.exec(tok);
+  affirm(m !== null, `unparseable duration: ${tok}`);
+  return Number(m[1]) * SEC[m[2]];
+}
 
-const rows = document.getElementById("rows");
-const sels = EDGES.map((e, i) => {
-  const tr = document.createElement("tr");
-  const sel = document.createElement("select");
-  PERIODS.forEach(p => sel.add(new Option(p, p)));
-  sel.value = DEFAULTS[i];
-  sel.addEventListener("input", render);
-  tr.innerHTML = `<td><span class="swatch" style="background:var(--band${i+1})"></span>${e.label}</td>` +
-                 `<td></td><td class="num"></td><td class="num"></td>`;
-  tr.children[1].append(sel);
-  rows.append(tr);
-  return sel;
-});
+// A bands line to {age, per} token pairs, same grammar and same ordering rule
+// as bandsparse in scrumblib.sh. Band count comes from the line, not from here.
+function bandsparse(line) {
+  const bands = line.trim().split(/ +/).map(pair => {
+    const m = /^([1-9][0-9]*[smhdwy]|inf):([1-9][0-9]*[smhdwy])$/.exec(pair);
+    affirm(m !== null, `bad band: ${pair}`);
+    return { age: m[1], per: m[2] };
+  });
+  bands.forEach((b, i) => affirm(
+    i === 0 || parsedur(b.age) > parsedur(bands[i-1].age),
+    `band max-ages must increase: ${b.age}`));
+  return bands;
+}
 
-const track = document.getElementById("track");
-const segs = EDGES.map((e, i) => {
-  const d = document.createElement("div");
-  d.className = "seg";
-  d.style.background = `var(--band${i+1})`;
-  track.append(d);
-  return d;
-});
+// Moments a band is expected to hold: its span over its keep-period, times the
+// measured fraction of capture slots that a real screenshot occupies.
+function bandmoments(edges, pers, occup) {
+  return edges.map((e, i) =>
+    (e - (i ? edges[i-1] : 0)) / parsedur(pers[i]) * occup);
+}
+
+// Band 0 is still raw jpg as captured; every older band has been archived.
+function bandbytes(moments, jpgb, webpb) {
+  return moments.map((m, i) => m * (i ? webpb : jpgb));
+}
+
+// Empty string when the conf line and allowance are usable, otherwise why not.
+// Pure validation, one return per rule; bandsparse() parses afterward,
+// trusting that lint passed.
+function lint(line, budget) {
+  const m = /^bands="(.+)"$/.exec(line);
+  if (m === null) return 'The line must keep the shape bands="..." exactly.';
+  const pairs = m[1].trim().split(/ +/);
+  const bad = pairs.find(p => !/^([1-9][0-9]*[smhdwy]|inf):[1-9][0-9]*[smhdwy]$/.test(p));
+  if (bad !== undefined) return `Not an age:period pair: "${bad}". Durations ` +
+    `are a positive whole number and one of s, m, h, d, w, y, or inf as ` +
+    `the last max-age.`;
+  const ages = pairs.map(p => parsedur(p.split(":")[0]));
+  const pers = pairs.map(p => parsedur(p.split(":")[1]));
+  if (ages[0] === Infinity)
+    return "The raw band's max-age can't be inf.";
+  if (ages[pairs.length - 1] !== Infinity)
+    return "The last band's max-age must be inf: nothing ever ages out.";
+  if (ages.some((a, i) => i > 0 && a <= ages[i-1]))
+    return "Band max-ages must increase, young to old.";
+  if (pers.some((p, i) => i > 0 && p < pers[i-1]))
+    return "Keep-periods may not decrease: older age bands need equal or " +
+           "longer periods than younger ones.";
+  if (pairs.length > 7)
+    return "At most 7 bands: the rainbow runs out of tellable-apart colors.";
+  if (!(budget > 0)) return "The space allowance must be a positive number.";
+  return "";
+}
+
+// Bytes the inf band accumulates per year of wall time: one archived
+// moment per keep-period, thinned by occupancy.
+function growrate(per, occup, webpb) {
+  return 31536000 / parsedur(per) * occup * webpb;
+}
+
+// Today's actual bytes and moment counts per band: each measured moment
+// lands in the first band whose max-age exceeds its age (age === edge goes
+// to the older band, matching cullwalk's age < E[i]). Ages ascend, so the
+// band index only ever advances; every age is finite, so the inf band needs
+// no special case.
+function bandnow(edges, moms) {
+  const bytes = edges.map(() => 0), count = edges.map(() => 0);
+  let i = 0;
+  moms.forEach(r => {
+    while (r[0] >= edges[i]) i++;
+    bytes[i] += r[1] + r[2];
+    count[i] += 1;
+  });
+  return { bytes, count };
+}
+
+// The band colors: a rainbow, by the owner's call, overriding the one-hue
+// ordinal default -- rainbow order carries the age order, hot young to cold
+// old. Hue runs red to green, then jumps over the cyan gamut trough to blue
+// through violet (ROYGBIV skips cyan too). Lightness zigzags between two
+// tiers so band neighbors always differ strongly in lightness, which
+// colorblindness preserves: validated with the dataviz checker at every
+// band count lint allows (worst adjacent CVD dE 9.6, all hard checks pass;
+// the light tier sits under 3:1 on white, relieved by the black segment
+// borders, the table, and the tooltips). Chroma is nominally constant and
+// the browser's CSS gamut mapping clamps it per hue, which the validation
+// mirrored numerically.
+function ramp(i, n) {
+  const t = i / Math.max(n - 1, 1);   // 0 at the newest band, 1 at the oldest
+  const h = t < 0.65 ? 27 + t / 0.65 * 113 : 235 + (t - 0.65) / 0.35 * 70;
+  return `oklch(${i % 2 ? 0.52 : 0.68} 0.17 ${h.toFixed(1)})`;
+}
 
 function gb(bytes) { return (bytes / 1e9).toFixed(2) + " GB"; }
-function num(id) { return Number(document.getElementById(id).value); }
+function mb(bytes) { return (bytes / 1e6).toFixed(2) + " MB"; }
+function tally(n)  { return Math.round(n).toLocaleString("en-US"); }
 
-function render() {
-  const periods = sels.map(s => s.value);
-  const conf = document.getElementById("conf");
-  const noninc = periods.some((p, i) =>
-    i > 0 && parsedur(p) < parsedur(periods[i-1]));
-  const alarm = document.getElementById("alarm");
-  conf.classList.toggle("invalid", noninc);
-  alarm.classList.toggle("on", noninc);
-  if (noninc) {
-    alarm.textContent =
-      "Keep-periods may not decrease: older age bands need equal or " +
-      "longer periods than younger ones.";
-  }
+// Quals. Expected values hand-computed from the sizes this page shipped with.
+(function quals() {
+  affirm(parsedur("5s") === 5 && parsedur("1y") === 31536000, "parsedur");
+  const b = bandsparse("1h:5s 1d:1m 7d:5m 30d:1h 1y:1d");
+  affirm(b.length === 5 && b[3].age === "30d" && b[3].per === "1h", "bandsparse");
+  const edges = b.map(x => parsedur(x.age));
+  const pers = b.map(x => x.per);
+  affirm(String(edges) === "3600,86400,604800,2592000,31536000", "band edges");
+  const mom = bandmoments(edges, pers, 1);
+  affirm(String(mom.map(Math.round)) === "720,1380,1728,552,335", "bandmoments");
+  const by = bandbytes(mom, 2.9e6, 750e3);
+  const want = [2.088e9, 1.035e9, 1.296e9, 4.14e8, 2.5125e8];
+  by.forEach((x, i) => affirm(Math.abs(x - want[i]) < 1e3, `bandbytes[${i}] = ${x}`));
+  const tot = by.reduce((a, x) => a + x, 0);
+  affirm(Math.abs(tot - 5.08425e9) < 1e4, `summa = ${tot}`);
+  const half = bandbytes(bandmoments(edges, pers, .5), 2.9e6, 750e3)
+                 .reduce((a, x) => a + x, 0);
+  affirm(Math.abs(half - tot / 2) < 1e4, `half occupancy = ${half}`);
+  affirm(bandsparse("1h:5s 1d:1m").length === 2, "two bands parse too");
+  affirm(parsedur("inf") === Infinity, "parsedur reads inf");
+  affirm(lint('bands="1h:5s inf:1m"', 5) === "", "lint passes the conf line");
+  affirm(lint('1h:5s inf:1m', 5) !== "", "lint wants the full bands= shape");
+  affirm(lint('bands="1h:5s 1y:1m"', 5) !== "", "lint requires the inf horizon");
+  affirm(lint('bands="1h:5s 1d:1s inf:1s"', 5) !== "", "lint catches decreasing periods");
+  affirm(lint('bands="1d:5s 1h:1m inf:1h"', 5) !== "", "lint catches non-increasing ages");
+  affirm(lint('bands="1h:5x inf:1m"', 5) !== "", "lint catches a bad duration");
+  affirm(lint('bands="1h:5s inf:1m"', 0) !== "", "lint catches a zero allowance");
+  const eight = Array.from({length: 7}, (_, i) => `${i+1}d:1h`).join(" ") + " inf:1h";
+  affirm(lint(`bands="${eight}"`, 5) !== "", "lint caps the ramp at 7 bands");
+  affirm(lint('bands="inf:1m"', 5) !== "", "lint keeps inf out of the raw band");
+  affirm(lint('bands="inf:5s 1y:1m"', 5) !== "", "lint keeps inf last");
+  affirm(lint('bands="1h:inf"', 5) !== "", "lint rejects inf as a period");
+  affirm(bandmoments([3600, Infinity], ["5s", "1m"], 1)[1] === Infinity,
+         "an inf band has no steady state");
+  // The inf display model, hand-computed: a 2h span against bands
+  // "1h:5s inf:1m" puts (7200-3600)/60 = 60 moments in the inf band so far,
+  // and at 500 bytes per archived moment it grows 31536000/60*500 = 262.8 MB
+  // a year.
+  affirm(bandmoments([3600, 7200], ["5s", "1m"], 1)[1] === 60, "span-capped inf band");
+  affirm(growrate("1m", 1, 500) === 262.8e6, "inf band growth rate");
+  const bn = bandnow([3600, 86400, Infinity],
+                     [[10, 100, 0], [3600, 0, 200], [90000, 0, 300]]);
+  affirm(String(bn.bytes) === "100,200,300" && String(bn.count) === "1,1,1",
+         "bandnow buckets, age === edge going to the older band");
+  affirm(String(bandnow([3600, Infinity], [[10, 5, 0]]).bytes) === "5,0",
+         "a band with no moments holds zero bytes");
+  const bn2 = bandnow([3600, Infinity], [[10, 100, 0], [20, 0, 50], [3600, 0, 200]]);
+  affirm(String(bn2.bytes) === "150,200" && String(bn2.count) === "2,1",
+         "bandnow accumulates several moments into one bucket");
+  affirm(String(bandnow([3600, Infinity], [[-100, 5, 0], [10, 7, 0]]).bytes) === "12,0",
+         "negative ages (DST slop) bucket into band 0");
+  affirm(lint('bands="1h:0s inf:1s"', 5) !== "", "lint rejects a zero keep-period");
+  affirm(lint('bands="0s:3s inf:1h"', 5) !== "", "lint rejects a zero max-age");
+  affirm(ramp(0, 6) === "oklch(0.68 0.17 27.0)", "ramp starts hot and light");
+  affirm(ramp(5, 6) === "oklch(0.52 0.17 305.0)", "ramp ends cold");
+  affirm(ramp(4, 7) === "oklch(0.68 0.17 238.3)", "the hue path skips the cyan trough");
+  affirm(ramp(0, 1) === "oklch(0.68 0.17 27.0)", "one band wears the hot end");
+  affirm(ramp(2, 7).includes("0.68") && ramp(3, 7).includes("0.52"),
+         "neighbors alternate lightness tiers, for colorblind separation");
+})();
 
-  const bytes = bandbytes(periods, num("jpgmb") * 1e6, num("webpkb") * 1e3,
-                          num("occup") / 100);
-  const imgs = EDGES.map((e, i) =>
-    (e.upto - (i === 0 ? 0 : EDGES[i-1].upto)) / parsedur(periods[i]));
+// Everything the page knows about the world comes from crumbudget.sh, which
+// reads scrumbs.conf, measures the screenshot directory, and writes both into
+// crumbudget.data.js -- the sibling script tag above, the one outside thing a
+// file:// page *can* load. (Not the url: macOS `open` strips #fragments and
+// ?queries from file:// urls.) So opening this page without running the
+// script is a loud error, not a guess.
+affirm(typeof CRUMBDATA !== "undefined",
+  "no crumbudget.data.js beside this page -- open it by running ./crumbudget.sh");
+affirm(typeof CRUMBDATA.bands === "string",
+  "no bands in crumbudget.data.js -- rerun ./crumbudget.sh");
+const KEYS = ["jpgb", "webpb", "occup", "span", "rawmom", "arcmom"];
+const M = {};
+KEYS.forEach(k => {
+  M[k] = Number(CRUMBDATA[k]);
+  affirm(Number.isFinite(M[k]) && M[k] > 0, `bad ${k}: ${CRUMBDATA[k]}`);
+});
+
+// The per-moment measurements, and the cross-checks that keep them and the
+// scalar means -- two aggregations of one measurement pass -- from ever
+// disagreeing silently. The byte check allows only the %.0f rounding slack
+// the means carry, half a byte per moment.
+affirm(Array.isArray(CRUMBDATA.moms) && CRUMBDATA.moms.length > 0,
+  "no moms in crumbudget.data.js -- rerun ./crumbudget.sh");
+const MOMS = CRUMBDATA.moms;
+// Ages may dip negative: wall-time epochs carry up to an hour of DST slop
+// (scrumblib.sh's header), and bandnow buckets a negative age into band 0.
+MOMS.forEach((r, i) => affirm(
+  Number.isFinite(r[0]) &&
+  Number.isInteger(r[1]) && r[1] >= 0 &&
+  Number.isInteger(r[2]) && r[2] >= 0 && r[1] + r[2] > 0 &&
+  (i === 0 || r[0] > MOMS[i-1][0]), `bad moment row ${i}: [${r}]`));
+const MOMBYTES = MOMS.reduce((a, r) => a + r[1] + r[2], 0);
+affirm(MOMS.filter(r => r[1] > 0).length === M.rawmom &&
+       MOMS.filter(r => r[2] > 0).length === M.arcmom,
+  "the moments disagree with the moment counts -- rerun ./crumbudget.sh");
+affirm(MOMS[MOMS.length - 1][0] === M.span,
+  "the moments disagree with the span -- rerun ./crumbudget.sh");
+affirm(Math.abs(MOMBYTES - (M.jpgb * M.rawmom + M.webpb * M.arcmom)) <=
+       (M.rawmom + M.arcmom) / 2,
+  "the moments disagree with the means -- rerun ./crumbudget.sh");
+
+document.getElementById("f-span").textContent =
+  (M.span / 86400).toFixed(1) + " days";
+document.getElementById("f-jpg").textContent =
+  `${mb(M.jpgb)}, from ${tally(M.rawmom)} moments`;
+document.getElementById("f-webp").textContent =
+  `${mb(M.webpb)}, from ${tally(M.arcmom)} moments`;
+document.getElementById("f-occup").textContent =
+  (100 * M.occup).toFixed(1) + "%";
+
+const bandsline = document.getElementById("bandsline");
+bandsline.value = `bands="${CRUMBDATA.bands}"`;
+
+// The conf line is the one source of truth, so a render starts from its text
+// and rebuilds the rows and bar segments outright -- editing the line can
+// change the band count, not just the numbers. While the limit line is being
+// dragged the caller passes fixscale, freezing the bar scale so the line
+// tracks the pointer; otherwise the scale follows the data and the budget.
+let lastscale = 0;
+function render(fixscale) {
+  const budget = Number(document.getElementById("budget").value) * 1e9;
+  const woe = lint(bandsline.value, budget);
+  document.getElementById("alarm").textContent = woe;
+  document.getElementById("alarm").classList.toggle("on", woe !== "");
+  document.body.classList.toggle("stale", woe !== "");
+  if (woe !== "") return;
+
+  const bands = bandsparse(/^bands="(.+)"$/.exec(bandsline.value)[1]);
+  const edges = bands.map(b => parsedur(b.age));
+  // The last band is inf (lint insists), so it has no steady state: it's
+  // sized by what the measured history span has put in it so far, and
+  // annotated below with the rate at which it grows forever. The finite
+  // bands sit at steady state.
+  const last = bands.length - 1;
+  const capped = edges.with(last, Math.max(M.span, edges[last - 1]));
+  const rate = growrate(bands[last].per, M.occup, M.webpb);
+  const moments = bandmoments(capped, bands.map(b => b.per), M.occup);
+  const bytes = bandbytes(moments, M.jpgb, M.webpb);
   const total = bytes.reduce((a, x) => a + x, 0);
-  const budget = num("budget") * 1e9;
-  const scale = Math.max(total, budget);
+  const nowband = bandnow(edges, MOMS);
+  const nowtotal = nowband.bytes.reduce((a, x) => a + x, 0);
+  affirm(nowtotal === MOMBYTES &&
+         nowband.count.reduce((a, x) => a + x, 0) === MOMS.length,
+    "the on-disk buckets must partition the moments");
+  const scale = fixscale || Math.max(total, nowtotal, budget);
+  lastscale = scale;
 
-  EDGES.forEach((e, i) => {
-    const tds = rows.children[i].children;
-    tds[2].textContent = Math.round(imgs[i]).toLocaleString("en-US");
-    tds[3].textContent = gb(bytes[i]);
-    segs[i].style.width = `calc(${100 * bytes[i] / scale}% - 2px)`;
-    segs[i].title = `${e.label}: ${periods[i]}, ${gb(bytes[i])}`;
+  const rows = document.getElementById("rows");
+  const nowtrack = document.getElementById("nowtrack");
+  const projtrack = document.getElementById("projtrack");
+  rows.innerHTML = "";
+  nowtrack.innerHTML = "";
+  projtrack.innerHTML = "";
+  bands.forEach((b, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td><span class="swatch"></span>${i ? bands[i-1].age : "0"}–${b.age}</td>` +
+      `<td>${b.per}</td>` +
+      `<td class="num">${tally(nowband.count[i])}</td>` +
+      `<td class="num">${tally(moments[i])}</td>` +
+      `<td class="num">${gb(nowband.bytes[i])}</td>` +
+      `<td class="num">${gb(bytes[i])}</td>`;
+    tr.querySelector(".swatch").style.background = ramp(i, bands.length);
+    rows.append(tr);
+    const seg = (track, frac, title) => {
+      const d = document.createElement("div");
+      d.className = "seg";
+      d.style.background = ramp(i, bands.length);
+      d.style.width = `${100 * frac}%`;
+      d.title = title;
+      track.append(d);
+    };
+    // the on-disk tooltip names the band's measured bytes; the
+    // projected one keeps its period-and-model form
+    seg(nowtrack, nowband.bytes[i] / scale,
+        `${b.age}: ${gb(nowband.bytes[i])} on disk`);
+    seg(projtrack, bytes[i] / scale, `${b.age}: ${b.per}, ${gb(bytes[i])}`);
   });
-  document.getElementById("totimg").textContent =
-    Math.round(imgs.reduce((a, x) => a + x, 0)).toLocaleString("en-US");
-  document.getElementById("totgb").textContent = gb(total);
+  // The growth annotation, on the inf band's projected cell and the total:
+  // growth is the model's claim, so the on-disk columns never carry it.
+  const grows = ` +${gb(rate)}/y`;
+  rows.children[last].children[5].textContent += grows;
+  document.getElementById("totmomnow").textContent = tally(MOMS.length);
+  document.getElementById("totmom").textContent =
+    tally(moments.reduce((a, x) => a + x, 0));
+  document.getElementById("totnow").textContent = gb(nowtotal);
+  document.getElementById("totgb").textContent = gb(total) + grows;
   document.getElementById("tick").style.left = `${100 * budget / scale}%`;
 
   const verdict = document.getElementById("verdict");
   verdict.classList.toggle("over", total > budget);
-  verdict.textContent = total > budget
+  verdict.textContent = (total > budget
     ? `Over the space allowance by ${gb(total - budget)}.`
-    : `Within the space allowance, ${gb(budget - total)} to spare.`;
-
-  document.getElementById("confline").textContent =
-    `bands="${EDGETOK.map((t, i) => `${t}:${periods[i]}`).join(" ")}"`;
+    : `Within the space allowance, ${gb(budget - total)} to spare.`)
+    + ` Grows ${gb(rate)} a year` + (total > budget ? "."
+      : `; reaches the allowance in ${((budget - total) / rate).toFixed(1)} years.`);
 }
 
-["budget", "occup", "jpgmb", "webpkb"].forEach(id =>
-  document.getElementById(id).addEventListener("input", render));
+bandsline.addEventListener("input", () => render());
+document.getElementById("budget").addEventListener("input", () => render());
 
-document.getElementById("copy").addEventListener("click", () => {
-  navigator.clipboard.writeText(
-    document.getElementById("confline").textContent
-  ).then(() => {
-    document.getElementById("copy").textContent = "Copied.";
-  }, err => affirm(false, `copy failed: ${err}`));
+// Drag the limit line to set the allowance. The scale freezes for the drag
+// so the line tracks the pointer exactly; releasing resumes the usual rule.
+document.getElementById("tick").addEventListener("pointerdown", e => {
+  const r = document.getElementById("tracks").getBoundingClientRect();
+  const s = lastscale;
+  const move = ev => {
+    const frac = Math.min(1, Math.max(0.01, (ev.clientX - r.left) / r.width));
+    document.getElementById("budget").value = (s * frac / 1e9).toFixed(1);
+    render(s);
+  };
+  addEventListener("pointermove", move);
+  addEventListener("pointerup", () => {
+    removeEventListener("pointermove", move);
+    render();
+  }, { once: true });
+  e.preventDefault();
 });
 
 render();
