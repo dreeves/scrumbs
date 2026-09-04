@@ -70,12 +70,25 @@ q "name2epoch rejects retired scdN-first names" 1 $?
 q "name2epoch rejects png (jpg/webp only)" 1 $?
 
 #-------------------------------------------------------------------------------
+# epoch2stamp: a wall-time epoch back to the wall-clock digits it was made
+# from, ie name2epoch's inverse on the timestamp part. Same gdate -u oracle,
+# since both ends live in local-wall-time space.
+#-------------------------------------------------------------------------------
+
+ep=$(echo "s2026-07-23-THU-15-55-33-d1.jpg" | name2epoch | cut -d' ' -f1)
+q "epoch2stamp inverts name2epoch" "2026-07-23 15:55:33" "$(epoch2stamp "$ep")"
+q "epoch2stamp at the epoch"       "1970-01-01 00:00:00" "$(epoch2stamp 0)"
+
+#-------------------------------------------------------------------------------
 # cullwalk: the anchor walk. Bands "100s:10s inf:100s", now=10000.
 # Files at ages 1100,950,890,600,550,505,150,50,45,40,5. Nothing is deleted
 # for age (there is no horizon; the oldest screenshot in particular is
-# immortal, so the history-span number stays honest). Hand-walked: only
-# age-550 dies (9495-9400 < 100); every gap the walk leaves is at least one
-# keep-period wide.
+# immortal, so the history-span number stays honest). The one rule: delete a
+# file iff its surviving neighbors end up within one target gap -- the
+# README's sliding-window criterion. Hand-walked: age-550 dies (its
+# neighbors close to 9495-9400 = 95 <= 100) and age-45 dies (its neighbors
+# close to 9960-9950 = 10 <= 10, the ideal gap exactly); everything else
+# would gape wider than its target gap and so survives.
 #-------------------------------------------------------------------------------
 
 cullin="8900 f-age1100
@@ -89,10 +102,16 @@ cullin="8900 f-age1100
 9955 f-age45
 9960 f-age40
 9995 f-age5"
-q "cullwalk deletions" "f-age550" \
+q "cullwalk deletions" "f-age550 f-age45" \
   "$(echo "$cullin" | cullwalk 10000 "100 inf" "10 100" | tr '\n' ' ' | sed 's/ $//')"
 q "cullwalk keeps everything when n<=2" "" \
   "$(echo "9995 f-solo" | cullwalk 10000 "100 inf" "10 100")"
+# The boundary is <=: a deletion that leaves its neighbors exactly one
+# target gap apart is safe (and ideal); one second wider is not.
+q "cullwalk deletes onto a gap of exactly the target" "x-mid" \
+  "$(printf '9800 x-a\n9850 x-mid\n9900 x-b\n' | cullwalk 10000 "100 inf" "10 100")"
+q "cullwalk keeps when the gap would exceed the target" "" \
+  "$(printf '9800 y-a\n9850 y-mid\n9901 y-b\n' | cullwalk 10000 "100 inf" "10 100")"
 q "cullwalk keeps ancient files, thinned by the last band" "" \
   "$(printf '5000 h-age5000\n9990 h-age10\n9995 h-age5\n' | \
      cullwalk 10000 "100 inf" "10 100")"
@@ -269,6 +288,13 @@ head -c 1000 /dev/zero > "$tmpb/s$t20-d1.jpg"
 head -c 2000 /dev/zero > "$tmpb/s$t20-d2.jpg"
 head -c  500 /dev/zero > "$tmpb/s$(stamp 100)-d1.webp"
 head -c  700 /dev/zero > "$tmpb/s$(stamp 200)-d1.webp"
+# Replicata for the in-flight-capture bug: screencapture writes ".sNAME.jpg"
+# and renames it into place, so a capture in flight during a measurement
+# matched the *.jpg glob and then either vanished before stat or reached
+# name2epoch as an unparseable name -- either way killing the run. sweep.sh
+# never had it; it lists by "^s[0-9]{4}-". Expectata: a dotfile is not ours,
+# so it is neither measured nor fatal.
+head -c 4000 /dev/zero > "$tmpb/.s$(stamp 10)-d1.jpg"
 cat > "$tmpb/conf" <<EOF
 path="$tmpb"
 bands="1m:5s inf:1m"
@@ -276,9 +302,16 @@ EOF
 out=$(SCRUMBSCONF="$tmpb/conf" PATH="$tmpb/bin:$PATH" "$tmpb/crumbudget.sh" 2>"$tmpb/err")
 q "crumbudget exits 0" 0 $?
 [[ -s "$tmpb/err" ]] && sed 's/^/  crumbudget stderr: /' "$tmpb/err"
+q "crumbudget ignores an in-flight capture dotfile" "" "$(cat "$tmpb/err")"
 data=$(cat "$tmpb/crumbudget.data.js" 2>/dev/null)
 has() { [[ $2 == *"$1"* ]] && echo yes || echo no; }
 q "crumbudget writes the bands line to the data file"  yes "$(has 'bands: "1m:5s inf:1m"' "$data")"
+# The stamp says when the numbers were taken, so a reader can tell a fresh
+# measurement from one the capture loop has since grown past. Its value moves
+# with the clock, so the qual checks its shape, not its digits.
+q "crumbudget stamps the measurement instant" 1 \
+  "$(grep -cE 'when: "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"' \
+     "$tmpb/crumbudget.data.js")"
 q "crumbudget measures bytes per raw moment"           yes "$(has 'jpgb: 3000' "$data")"
 q "crumbudget measures bytes per archived moment"      yes "$(has 'webpb: 600' "$data")"
 q "crumbudget counts the moments behind each mean"     yes "$(has 'rawmom: 1, arcmom: 2' "$data")"
@@ -318,6 +351,7 @@ q "Space spans the two byte columns"       1 "$(grep -c 'colspan="2">Space<' cru
 q "Moments splits the same way"            1 "$(grep -c 'colspan="2">Moments<' crumbudget.html)"
 q "the total row has an on-disk cell"      1 "$(grep -c 'id="totnow"' crumbudget.html)"
 q "the total row counts on-disk moments"   1 "$(grep -c 'id="totmomnow"' crumbudget.html)"
+q "the measured panel is stamped"          1 "$(grep -c 'id="f-when"' crumbudget.html)"
 q "the limit line is draggable"            1 "$(grep -c 'pointerdown' crumbudget.html)"
 q "the bands wear the rainbow, not goldenrod" 0 "$(grep -c ' 83)' crumbudget.html)"
 q "per-band period widgets are gone"       0 \

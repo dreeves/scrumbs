@@ -98,6 +98,13 @@ localnow() {
     awk "$CIVILAWK"'{ print dfc($1+0, $2+0, $3+0)*86400 + $4*3600 + $5*60 + $6 }'
 }
 
+# A wall-time epoch back to the wall-clock digits it was made from, ie
+# name2epoch's inverse on the timestamp part. Reading the epoch as UTC undoes
+# exactly the no-conversion trick that made it (see the header comment).
+epoch2stamp() {
+  /opt/homebrew/bin/gdate -u -d "@$1" '+%Y-%m-%d %H:%M:%S'
+}
+
 # Affirm that an edges list ends in inf, as bandsparse guarantees. The awk
 # walkers below lean on that (an age is always inside some band), so a finite
 # last edge from any other caller dies here rather than walking wrong.
@@ -109,27 +116,32 @@ haltunlessinf() {
 # The cull walk: cullwalk <nowepoch> <edges> <pers>
 # Stdin:  "epoch name" lines sorted oldest first (one display's timeline).
 # Stdout: names of files to delete.
-# Nothing dies for age -- there is no horizon, so the oldest screenshot is
-# immortal by construction and the history-span number stays honest. This is
-# the anchor walk from the README: keep the first and last file; keep an
-# interior file iff its successor is at least one keep-period past the last
-# kept file, where the keep-period comes from the file's own age band. This
-# avoids the too-big-gap flaw of naive walk-and-delete.
+# One rule, the README's sliding-window criterion: delete a file iff its
+# surviving neighbors end up within one target gap of each other, where the
+# target gap is the keep-period of the deleted file's own age band. Those
+# are exactly the deletions that can never create a too-wide gap: each one
+# bridges at most a target gap, later deletions obey the same rule, so no
+# sequence of them can gape either; and any other deletion gapes immediately,
+# which nothing can later narrow. Endpoints have no neighbor pair, so the
+# first and last file always survive -- the oldest screenshot's immortality
+# is the left-endpoint case. Applying the rule oldest-first and eagerly
+# reaches the fewest-survivors normal form (a lazier order can strand extra
+# files), and a rerun then deletes nothing, since every surviving triple
+# spans more than its target gap. Nothing dies for age: there is no horizon.
 cullwalk() {
   haltunlessinf "$2"
   awk -v now="$1" -v edg="$2" -v per="$3" '
   BEGIN { nb = split(edg, E, " "); split(per, P, " ") }
-  function G(age,   i) {
+  function tgap(age,   i) {
     for (i = 1; i <= nb; i++) if (age < E[i]) return P[i]
     return -1  # unreachable: every age is under the inf edge
   }
   { ep[NR] = $1; nm[NR] = $2 }
   END {
-    if (NR <= 2) exit 0  # no interior points => nothing to cull
-    anchor = ep[1]
+    anchor = ep[1]                 # the newest survivor so far
     for (i = 2; i < NR; i++) {
-      if (ep[i+1] - anchor >= G(now - ep[i])) anchor = ep[i]
-      else print nm[i]
+      if (ep[i+1] - anchor <= tgap(now - ep[i])) print nm[i]
+      else anchor = ep[i]
     }
   }'
 }

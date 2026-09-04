@@ -202,6 +202,8 @@ body.stale #barwrap, body.stale table, body.stale #verdict { opacity: .35; }
        asking the reader to guess at per-screenshot sizes the way it used to -->
   <legend>Measured from the screenshots on disk</legend>
   <dl id="facts">
+    <!-- TODO: this label says when the numbers below were measured -->
+    <dt>Tempus mensurae</dt>          <dd id="f-when"></dd>
     <dt>History on disk</dt>          <dd id="f-span"></dd>
     <dt>Size per raw moment</dt>      <dd id="f-jpg"></dd>
     <dt>Size per archived moment</dt> <dd id="f-webp"></dd>
@@ -406,6 +408,9 @@ affirm(typeof CRUMBDATA !== "undefined",
   "no crumbudget.data.js beside this page -- open it by running ./crumbudget.sh");
 affirm(typeof CRUMBDATA.bands === "string",
   "no bands in crumbudget.data.js -- rerun ./crumbudget.sh");
+// TODO: says the data file carries no measurement stamp, so rerun the script
+affirm(typeof CRUMBDATA.when === "string",
+  "tempus mensurae abest in crumbudget.data.js -- curre iterum ./crumbudget.sh");
 const KEYS = ["jpgb", "webpb", "occup", "span", "rawmom", "arcmom"];
 const M = {};
 KEYS.forEach(k => {
@@ -437,6 +442,7 @@ affirm(Math.abs(MOMBYTES - (M.jpgb * M.rawmom + M.webpb * M.arcmom)) <=
        (M.rawmom + M.arcmom) / 2,
   "the moments disagree with the means -- rerun ./crumbudget.sh");
 
+document.getElementById("f-when").textContent = CRUMBDATA.when;
 document.getElementById("f-span").textContent =
   (M.span / 86400).toFixed(1) + " days";
 document.getElementById("f-jpg").textContent =
